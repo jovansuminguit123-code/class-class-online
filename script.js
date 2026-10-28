@@ -19,8 +19,10 @@ const who = document.getElementById("who");
 const messageList = document.getElementById("messages");
 const messageForm = document.getElementById("message-form");
 const messageInput = document.getElementById("message-input");
+const clearAllBtn = document.getElementById("clear-all-btn");
 
 let currentUser = null;
+const ADMIN_USER_ID = "ff86c6c2-3ca1-4fcf-b257-5a9f3f274783";
 const names = {};
 let channel = null;
 
@@ -112,6 +114,7 @@ async function startChat(user) {
     "Me";
 
   who.textContent = names[user.id];
+  clearAllBtn.hidden = user.id !== ADMIN_USER_ID;
 
   await loadMessages();
   listenForNewMessages();
@@ -120,6 +123,7 @@ async function startChat(user) {
 
 function stopChat() {
   currentUser = null;
+  clearAllBtn.hidden = true;
 
   if (channel) sb.removeChannel(channel);
   channel = null;
@@ -243,6 +247,29 @@ function showMessage(msg) {
   });
 
   item.append(author, text, time);
+
+  if (msg.user_id === currentUser.id) {
+  const unsendBtn = document.createElement("button");
+  unsendBtn.textContent = "Unsend";
+  unsendBtn.className = "ghost";
+
+  unsendBtn.addEventListener("click", async () => {
+    if (!confirm("I-unsend ang message na ito?")) return;
+
+    const { error } = await sb
+      .from("messages")
+      .delete()
+      .eq("id", msg.id)
+      .eq("user_id", currentUser.id);
+
+    if (error) {
+      alert("Hindi na-unsend: " + error.message);
+    }
+  });
+
+  item.appendChild(unsendBtn);
+}
+
   messageList.appendChild(item);
   messageList.scrollTop = messageList.scrollHeight;
 }
@@ -388,3 +415,31 @@ function showBotMessage(text) {
   messageList.appendChild(item);
   messageList.scrollTop = messageList.scrollHeight;
 }
+
+clearAllBtn.addEventListener("click", async () => {
+  if (!currentUser || currentUser.id !== ADMIN_USER_ID) {
+    alert("No permission.");
+    return;
+  }
+
+  const confirmed = confirm(
+    "Are you sure delete All chat."
+  );
+
+  if (!confirmed) return;
+
+  clearAllBtn.disabled = true;
+
+  const { error } = await sb.rpc("clear_all_chat_messages");
+
+  clearAllBtn.disabled = false;
+
+  if (error) {
+    alert("Hindi na-clear ang chat: " + error.message);
+    console.error("Clear all chat error:", error);
+    return;
+  }
+
+  messageList.innerHTML = "";
+  alert("Na-clear na ang lahat ng chat messages.");
+});
